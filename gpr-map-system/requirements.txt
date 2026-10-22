@@ -1,0 +1,5 @@
+# 仅供本地从官方 .xls 重新生成 gpr_raw.csv 时使用；
+# Docker 构建阶段运行 preprocess.py 不需要这些依赖（仅标准库）。
+pandas>=2.0
+xlrd>=2.0
+openpyxl>=3.1

@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>全球地缘政治风险（GPR）地图系统</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%236d28d9'/%3E%3Ctext x='32' y='42' font-size='22' fill='white' text-anchor='middle' font-family='Arial' font-weight='bold'%3EGPR%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="assets/leaflet/leaflet.css">
+<style>
+  :root{
+    --bg:#eef2f7;
+    --surface:#ffffff;
+    --ink:#0f172a;
+    --muted:#64748b;
+    --line:#e2e8f0;
+    --accent:#6d28d9;
+    --accent-deep:#4c1d95;
+    --accent-soft:#f5f3ff;
+    --radius:16px;
+    --shadow:0 1px 2px rgba(15,23,42,.05), 0 10px 30px rgba(15,23,42,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 520px at 8% -10%, #ede9fe 0%, rgba(237,233,254,0) 62%),
+      radial-gradient(900px 420px at 100% 0%, #e0f2fe 0%, rgba(224,242,254,0) 58%),
+      var(--bg);
+    color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button,input,select{font-family:inherit}
+  button{cursor:pointer}
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:18px;
+    padding:14px 20px 12px;
+  }
+  .brand{display:flex;align-items:center;gap:12px;min-width:0}
+  .logo{
+    flex:none;width:46px;height:46px;border-radius:14px;
+    background:linear-gradient(145deg,#7c3aed 0%,#4c1d95 100%);
+    color:#fff;display:grid;place-items:center;
+    font-size:14px;font-weight:800;letter-spacing:.6px;
+    box-shadow:0 10px 22px rgba(109,40,217,.28);
+  }
+  .brand h1{margin:0;font-size:19px;letter-spacing:.2px;white-space:nowrap}
+  .brand p{margin:3px 0 0;font-size:11px;color:var(--muted);display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+  .brand p .sep{color:#cbd5e1}
+  .kpis{display:grid;grid-template-columns:repeat(4,minmax(118px,1fr));gap:8px}
+  .kpi{
+    background:rgba(255,255,255,.78);
+    border:1px solid rgba(226,232,240,.95);
+    border-radius:12px;padding:7px 11px;min-width:0;
+    box-shadow:0 1px 2px rgba(15,23,42,.03);
+  }
+  .kpi label{display:block;font-size:9.5px;color:var(--muted);letter-spacing:.35px;white-space:nowrap}
+  .kpi strong{
+    display:block;font-size:17px;line-height:1.2;margin-top:2px;
+    font-variant-numeric:tabular-nums;letter-spacing:-.2px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .kpi strong.kpi-text{font-size:14px;font-weight:700}
+  .kpi em{font-style:normal;font-size:9.5px;color:#94a3b8;display:block;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kpi em.up{color:#c1121f}
+  .kpi em.down{color:#2b9348}
+
+  /* ---------- 工具条 ---------- */
+  .toolbar{
+    margin:0 20px 12px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    box-shadow:var(--shadow);
+    padding:9px 14px;
+    display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+  }
+  .month-wrap{flex:1 1 380px;max-width:560px;min-width:300px;display:flex;flex-direction:column;gap:3px}
+  .month-row{display:flex;align-items:center;gap:9px}
+  .cap{font-size:10px;color:var(--muted);white-space:nowrap;letter-spacing:.3px}
+  .play-btn{
+    flex:none;width:26px;height:26px;border-radius:50%;
+    border:1px solid #ddd6fe;background:var(--accent-soft);color:var(--accent-deep);
+    display:grid;place-items:center;font-size:10px;line-height:1;
+    transition:transform .15s ease, background .15s ease;
+  }
+  .play-btn:hover{background:#ede9fe;transform:scale(1.05)}
+  .range{flex:1;min-width:120px}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;
+    width:100%;height:4px;border-radius:99px;outline:none;
+    background:linear-gradient(90deg,#7c3aed 0%,#7c3aed var(--p,0%),#e2e8f0 var(--p,0%),#e2e8f0 100%);
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:#fff;border:3px solid #6d28d9;
+    box-shadow:0 2px 7px rgba(76,29,149,.35);cursor:pointer;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:11px;height:11px;border-radius:50%;background:#fff;border:3px solid #6d28d9;
+    box-shadow:0 2px 7px rgba(76,29,149,.35);cursor:pointer;
+  }
+  .scale{display:flex;justify-content:space-between;padding:0 2px;font-size:8.5px;color:#a8b3c4}
+  .month-select{
+    flex:none;font-weight:700;font-size:11.5px;color:var(--accent-deep);
+    background:var(--accent-soft);border:1px solid #ddd6fe;border-radius:8px;
+    padding:4px 7px;outline:none;cursor:pointer;
+  }
+  .toolbar-right{display:flex;align-items:center;gap:12px;margin-left:auto;flex-wrap:wrap}
+  .metric-chip{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:10px;color:#475569;background:#f8fafc;border:1px solid var(--line);
+    border-radius:99px;padding:4px 9px;white-space:nowrap;
+  }
+  .metric-chip i{width:6px;height:6px;border-radius:50%;background:#7c3aed;box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+  .switch{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);cursor:pointer;white-space:nowrap;user-select:none}
+  .switch input{
+    appearance:none;-webkit-appearance:none;width:30px;height:16px;border-radius:99px;
+    background:#cbd5e1;position:relative;transition:background .18s ease;cursor:pointer;margin:0;
+  }
+  .switch input::before{
+    content:"";position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;
+    top:2px;left:2px;transition:left .18s ease;box-shadow:0 1px 3px rgba(15,23,42,.25);
+  }
+  .switch input:checked{background:#7c3aed}
+  .switch input:checked::before{left:16px}
+  .export-group{display:inline-flex;align-items:center;gap:5px}
+  .export-label{font-size:10px;color:#94a3b8;margin-right:1px}
+  .btn{
+    border:1px solid var(--line);background:#fff;color:#334155;border-radius:8px;
+    padding:4px 8px;font-size:10px;font-weight:600;letter-spacing:.2px;
+    transition:all .15s ease;white-space:nowrap;
+  }
+  .btn:hover{border-color:#c4b5fd;color:var(--accent-deep);background:var(--accent-soft)}
+  .btn.icon{padding:4px 7px;font-size:12px}
+
+  /* ---------- 布局 ---------- */
+  .layout{
+    display:grid;grid-template-columns:minmax(0,1fr) 372px;gap:14px;
+    padding:0 20px 18px;
+    height:calc(100vh - 162px);
+    min-height:540px;
+  }
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow:hidden;min-height:0;
+  }
+  .map-card{display:flex;flex-direction:column;position:relative}
+  .card-head{
+    flex:none;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:10px 14px;border-bottom:1px solid #f1f5f9;
+  }
+  .card-head h2{margin:0;font-size:12.5px;letter-spacing:.25px;display:flex;align-items:center;gap:7px}
+  .card-head h2 .sub{font-size:9.5px;color:#94a3b8;font-weight:500;letter-spacing:.2px}
+  .card-head .hint{font-size:9.5px;color:#94a3b8;white-space:nowrap}
+  .head-right{display:flex;align-items:center;gap:8px}
+  .badge-month{
+    font-size:10.5px;font-weight:700;color:var(--accent-deep);background:var(--accent-soft);
+    border:1px solid #ddd6fe;padding:2px 8px;border-radius:99px;letter-spacing:.3px;
+  }
+  #map{flex:1;min-height:0;background:#dfe9f3;z-index:0}
+
+  /* ---------- 右栏 ---------- */
+  .side{display:grid;grid-template-rows:minmax(0,.9fr) minmax(0,1.1fr);gap:14px;min-height:0}
+  .rank-card{display:flex;flex-direction:column}
+  .rank-card .card-head{padding-bottom:6px}
+  .rank-count{font-size:9.5px;color:#94a3b8;font-weight:500}
+  .search-box{position:relative;margin:6px 12px 2px;flex:none}
+  .search-box input{
+    width:100%;padding:6px 9px 6px 27px;border-radius:8px;border:1px solid var(--line);
+    background:#f8fafc;font-size:10.5px;outline:none;color:var(--ink);
+  }
+  .search-box input:focus{border-color:#c4b5fd;background:#fff;box-shadow:0 0 0 3px rgba(124,58,237,.08)}
+  .search-box svg{position:absolute;left:8px;top:7px;width:12px;height:12px;color:#94a3b8}
+  .rank-list{flex:1;min-height:0;overflow:auto;padding:3px 7px 7px}
+  .rank-list::-webkit-scrollbar,.side::-webkit-scrollbar{width:5px}
+  .rank-list::-webkit-scrollbar-thumb{background:#dbe3ee;border-radius:99px}
+  .rank-row{
+    display:flex;align-items:center;gap:7px;padding:4px 6px;border-radius:8px;
+    cursor:pointer;transition:background .13s ease,box-shadow .13s ease;
+  }
+  .rank-row:hover{background:#f8fafc}
+  .rank-row.is-selected{background:#f5f3ff;box-shadow:inset 2px 0 0 #7c3aed}
+  .rank-row:focus-visible{outline:2px solid #c4b5fd;outline-offset:-1px}
+  .rank-no{flex:none;width:17px;text-align:center;font-size:9px;font-weight:700;color:#a8b3c4;font-variant-numeric:tabular-nums}
+  .rank-row:nth-child(-n+3) .rank-no{color:#7c3aed}
+  .rank-main{flex:1;min-width:0}
+  .rank-top{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
+  .rank-name{font-size:10.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rank-name span{font-size:8.5px;color:#a8b3c4;font-weight:500;margin-left:3px;letter-spacing:.2px}
+  .rank-val{font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .rank-bar-wrap{height:3px;background:#eef2f7;border-radius:99px;overflow:hidden;margin-top:2px}
+  .rank-bar{height:100%;border-radius:99px;transition:width .32s ease}
+  .rank-empty{padding:16px;text-align:center;font-size:10px;color:#94a3b8}
+
+  .trend-card{display:flex;flex-direction:column;position:relative}
+  .chips{flex:none;display:flex;flex-wrap:wrap;gap:4px;padding:7px 12px 0;min-height:27px}
+  .chip{
+    display:inline-flex;align-items:center;gap:4px;font-size:9.5px;color:#334155;
+    background:#f8fafc;border:1px solid var(--line);border-radius:99px;padding:2px 6px;
+  }
+  .chip i{width:6px;height:6px;border-radius:50%;flex:none}
+  .chip button{border:0;background:transparent;color:#94a3b8;font-size:11px;line-height:1;padding:0 1px}
+  .chip button:hover{color:#c1121f}
+  #trendChart{flex:1;min-height:0;width:100%}
+  .chart-empty{
+    position:absolute;inset:64px 12px 12px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:4px;text-align:center;
+    font-size:11px;color:#94a3b8;pointer-events:none;
+  }
+  .chart-empty small{font-size:9.5px;color:#b6c0cf}
+  .chart-empty.hidden{display:none}
+
+  /* ---------- Leaflet ---------- */
+  .leaflet-container{font-family:inherit;background:#dfe9f3}
+  .leaflet-control-zoom a{
+    color:#334155!important;border-radius:7px!important;border-color:#e2e8f0!important;
+    box-shadow:0 2px 8px rgba(15,23,42,.08);font-weight:600;
+  }
+  .leaflet-control-attribution{
+    background:rgba(255,255,255,.75)!important;font-size:8.5px!important;color:#94a3b8!important;
+    border-radius:6px 0 0 0;padding:2px 7px!important;
+  }
+  .leaflet-control-attribution a{color:#7c3aed!important}
+  .map-legend{
+    background:rgba(255,255,255,.94);border:1px solid rgba(226,232,240,.95);
+    border-radius:10px;padding:8px 10px;box-shadow:0 8px 24px rgba(15,23,42,.12);
+    min-width:160px;backdrop-filter:blur(4px);
+  }
+  .lg-title{font-size:9.5px;font-weight:700;color:#334155;margin-bottom:5px;white-space:nowrap}
+  .lg-title span{font-weight:500;color:#94a3b8;font-size:8.5px}
+  .lg-row{display:flex;align-items:center;gap:6px;font-size:8.5px;color:#475569;margin:2.5px 0;white-space:nowrap}
+  .lg-row i{width:13px;height:8px;border-radius:2px;flex:none;border:1px solid rgba(255,255,255,.6)}
+  .lg-row span{flex:1}
+  .lg-row b{font-weight:600;color:#334155;font-variant-numeric:tabular-nums}
+  .lg-row.lg-missing i{background:#d4dae3}
+  .lg-row.lg-missing span,.lg-row.lg-missing b{color:#94a3b8}
+
+  /* Tooltip */
+  .leaflet-tooltip.gpr-tooltip{
+    background:linear-gradient(180deg,rgba(15,23,42,.98),rgba(17,24,39,.98));
+    border:1px solid rgba(148,163,184,.28);
+    color:#e2e8f0;border-radius:12px;padding:0;
+    box-shadow:0 18px 44px rgba(2,6,23,.38);
+    min-width:198px;overflow:hidden;
+  }
+  .leaflet-tooltip.gpr-tooltip::before{border-top-color:rgba(17,24,39,.98)}
+  .tt-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px 0}
+  .tt-head b{font-size:13px;color:#fff;letter-spacing:.2px}
+  .tt-head span{font-size:8.5px;color:#94a3b8;letter-spacing:.7px;font-weight:600}
+  .tt-body{padding:3px 12px 9px}
+  .tt-value{display:flex;align-items:baseline;gap:5px}
+  .tt-value strong{font-size:25px;font-weight:800;color:#fff;letter-spacing:-.6px;font-variant-numeric:tabular-nums;line-height:1.15}
+  .tt-unit{font-size:9.5px;color:#94a3b8}
+  .tt-badge{
+    margin-left:auto;align-self:center;padding:2px 7px;border-radius:99px;
+    font-size:8.5px;font-weight:700;letter-spacing:.2px;
+  }
+  .tt-meta{
+    display:flex;gap:12px;font-size:9px;color:#94a3b8;margin-top:5px;
+    border-top:1px solid rgba(148,163,184,.18);padding-top:6px;
+  }
+  .tt-meta b{color:#e2e8f0;font-weight:600}
+  .tt-meta .up{color:#fb7185}
+  .tt-meta .down{color:#4ade80}
+  .tt-empty{font-size:13px;color:#e2e8f0;font-weight:600;padding:2px 12px 0}
+  .tt-note{font-size:8.5px;color:#94a3b8;padding:4px 12px 10px}
+
+  .event-icon{background:transparent!important;border:0!important}
+  .event-dot{
+    display:block;width:12px;height:12px;border-radius:50%;
+    background:#f59e0b;border:2px solid #fff;
+    box-shadow:0 1px 5px rgba(15,23,42,.35),0 0 0 3px rgba(245,158,11,.22);
+  }
+  .event-icon.is-active .event-dot{
+    background:#dc2626;box-shadow:0 1px 5px rgba(15,23,42,.4),0 0 0 5px rgba(220,38,38,.25);
+    animation:eventPulse 1.9s ease-out infinite;
+  }
+  @keyframes eventPulse{
+    0%{box-shadow:0 1px 5px rgba(15,23,42,.4),0 0 0 4px rgba(220,38,38,.35)}
+    70%{box-shadow:0 1px 5px rgba(15,23,42,.4),0 0 0 11px rgba(220,38,38,0)}
+    100%{box-shadow:0 1px 5px rgba(15,23,42,.4),0 0 0 4px rgba(220,38,38,0)}
+  }
+  .leaflet-tooltip.event-tooltip{
+    background:#fffbeb;color:#7c2d12;border:1px solid #fde68a;border-radius:10px;
+    box-shadow:0 12px 30px rgba(124,45,18,.2);padding:8px 10px;width:240px;max-width:250px;
+    white-space:normal;
+  }
+  .leaflet-tooltip.event-tooltip::before{border-top-color:#fde68a}
+  .ev-title{font-size:11px;font-weight:700;line-height:1.35}
+  .ev-date{font-size:8.5px;color:#c2410c;margin:2px 0 3px;font-weight:600;letter-spacing:.3px}
+  .ev-desc{font-size:9.5px;line-height:1.55;color:#7c2d12}
+
+  /* 加载 / 提示 */
+  .loading{
+    position:absolute;inset:41px 0 0;z-index:600;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:10px;background:rgba(248,250,252,.82);
+    backdrop-filter:blur(2px);font-size:11px;color:#64748b;transition:opacity .25s ease;
+  }
+  .loading.hide{opacity:0;pointer-events:none}
+  .spinner{
+    width:26px;height:26px;border-radius:50%;border:3px solid #ede9fe;
+    border-top-color:#7c3aed;animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .toast{
+    position:fixed;left:50%;bottom:26px;transform:translate(-50%,16px);
+    background:rgba(15,23,42,.95);color:#f8fafc;font-size:11px;
+    padding:8px 14px;border-radius:9px;box-shadow:0 12px 30px rgba(2,6,23,.35);
+    opacity:0;pointer-events:none;transition:all .22s ease;z-index:2000;
+  }
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  /* ---------- 响应式 ---------- */
+  @media (max-width:1180px){
+    .layout{grid-template-columns:1fr;height:auto;min-height:0}
+    .map-card{height:62vh;min-height:420px}
+    .side{grid-template-columns:1fr 1fr;grid-template-rows:360px}
+    .rank-card,.trend-card{height:360px}
+    .kpis{grid-template-columns:repeat(2,minmax(112px,1fr))}
+    .month-wrap{max-width:none;flex-basis:100%}
+  }
+  @media (max-width:820px){
+    .topbar{flex-direction:column;align-items:flex-start;gap:10px;padding:12px 14px 10px}
+    .kpis{width:100%;grid-template-columns:repeat(4,1fr)}
+    .kpi strong{font-size:14px}
+    .kpi strong.kpi-text{font-size:12px}
+    .toolbar{margin:0 12px 10px;padding:8px 10px}
+    .layout{padding:0 12px 20px}
+    .map-card{height:56vh;min-height:380px}
+    .side{grid-template-columns:1fr;grid-template-rows:360px 340px}
+    .rank-card,.trend-card{height:auto}
+    .card-head .hint{display:none}
+    .toolbar-right{width:100%;justify-content:space-between;gap:8px}
+  }
+  @media (max-width:560px){
+    .brand h1{font-size:16px}
+    .brand p{font-size:9.5px}
+    .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+    .kpi:nth-child(4){display:none}
+    .month-wrap{min-width:0;flex-basis:100%}
+    .map-card{height:46vh;min-height:320px}
+    .export-label{display:none}
+    .metric-chip{display:none}
+    .map-legend{transform:scale(.9);transform-origin:bottom left}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">GPR</div>
+    <div>
+      <h1>全球地缘政治风险地图</h1>
+      <p>
+        <span>Geopolitical Risk Index</span><span class="sep">·</span>
+        <span id="metaRange">2020–2026</span><span class="sep">·</span>
+        <span id="metaCount">44 个国家 / 地区</span>
+      </p>
+    </div>
+  </div>
+  <div class="kpis">
+    <div class="kpi" title="Caldara & Iacoviello 全球 GPR 指数（1985–2019 = 100）">
+      <label>全球 GPR 指数</label>
+      <strong id="kpiGlobal">–</strong>
+      <em id="kpiGlobalDelta">环比 –</em>
+    </div>
+    <div class="kpi">
+      <label>覆盖国家 / 地区</label>
+      <strong id="kpiCoverage">44</strong>
+      <em id="kpiMonths">81 个月 · 2020–2026</em>
+    </div>
+    <div class="kpi" title="GPRC ≥ 1.00 的国家数量">
+      <label>高风险国家</label>
+      <strong id="kpiHigh">–</strong>
+      <em>GPRC ≥ 1.00</em>
+    </div>
+    <div class="kpi">
+      <label>最高风险</label>
+      <strong id="kpiTop" class="kpi-text">–</strong>
+      <em id="kpiTopVal">–</em>
+    </div>
+  </div>
+</header>
+
+<div class="toolbar">
+  <div class="month-wrap">
+    <div class="month-row">
+      <span class="cap">月份</span>
+      <button class="play-btn" id="playBtn" title="播放时间序列" aria-label="播放时间序列">▶</button>
+      <input class="range" id="monthSlider" type="range" min="0" max="80" step="1" value="80" aria-label="选择月份">
+      <select class="month-select" id="monthSelect" aria-label="月份下拉选择"></select>
+    </div>
+    <div class="scale">
+      <span>2020</span><span>2021</span><span>2022</span><span>2023</span><span>2024</span><span>2025</span><span>2026</span>
+    </div>
+  </div>
+  <div class="toolbar-right">
+    <span class="metric-chip" title="国别 GPRC 指数，单位为占报纸文章比例（%）"><i></i>GPRC · 国别指数</span>
+    <label class="switch" title="显示 / 隐藏重大地缘政治事件标注">
+      <input type="checkbox" id="eventToggle" checked>
+      事件标注
+    </label>
+    <div class="export-group">
+      <span class="export-label">导出</span>
+      <button class="btn" id="exportCsv" title="导出当前月份 CSV">CSV</button>
+      <button class="btn" id="exportJson" title="导出当前月份 JSON">JSON</button>
+      <button class="btn" id="exportPng" title="导出地图 PNG">PNG</button>
+    </div>
+    <button class="btn icon" id="resetView" title="复位地图视图" aria-label="复位地图视图">⟲</button>
+  </div>
+</div>
+
+<main class="layout">
+  <section class="card map-card">
+    <div class="card-head">
+      <h2>全球风险分布 <span class="sub">Choropleth · 5 档配色</span></h2>
+      <div class="head-right">
+        <span class="badge-month" id="mapMonthBadge">–</span>
+        <span class="hint">滚轮缩放 · 拖拽平移 · 点击国家加入对比</span>
+      </div>
+    </div>
+    <div id="map"></div>
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p id="loadingText">正在加载 GPR 数据…</p>
+    </div>
+  </section>
+
+  <aside class="side">
+    <section class="card rank-card">
+      <div class="card-head">
+        <h2>风险排名 <span class="sub" id="rankMonth">–</span></h2>
+        <span class="rank-count" id="rankCount">Top 10</span>
+      </div>
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input type="text" id="countrySearch" placeholder="搜索国家 / ISO3 / 区域" aria-label="搜索国家">
+      </div>
+      <div class="rank-list" id="rankList"></div>
+    </section>
+
+    <section class="card trend-card">
+      <div class="card-head">
+        <h2>历史趋势对比 <span class="sub">2020–2026</span></h2>
+        <span class="hint" id="trendMonth">–</span>
+      </div>
+      <div class="chips" id="chips"></div>
+      <div id="trendChart"></div>
+      <div class="chart-empty" id="chartEmpty">点击地图中的国家查看趋势<br><small>支持最多 5 个国家并排对比</small></div>
+    </section>
+  </aside>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="assets/leaflet/leaflet.js"></script>
+<script src="assets/echarts/echarts.min.js"></script>
+<script src="assets/html2canvas.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ======================================================================
+   * 全局状态
+   * ==================================================================== */
+  var DATA = null;
+  var WORLD = null;
+  var MONTHS = [];
+  var THRESHOLDS = [];
+  var COLORS = [];
+  var LEVELS = [];
+  var RANGES = [];
+  var MAP = null;
+  var GEO_LAYER = null;
+  var EVENT_GROUP = null;
+  var CHART = null;
+  var LAYERS = {};
+  var NAME_CACHE = {};
+
+  var state = {
+    month: "",
+    selected: new Set(["CHN", "USA", "RUS"]),
+    hoverIso: null,
+    eventsVisible: true,
+    playing: false,
+    playTimer: null
+  };
+
+  var SERIES_COLORS = ["#2563eb", "#dc2626", "#059669", "#d97706", "#7c3aed"];
+  var NO_DATA_COLOR = "#d4dae3";
+  var rankCache = {};
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ======================================================================
+   * 工具
+   * ==================================================================== */
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function fmt(value, digits) {
+    if (value == null) return "—";
+    return Number(value).toFixed(digits == null ? 2 : digits);
+  }
+
+  function riskIndex(value) {
+    if (value == null) return null;
+    for (var i = 0; i < THRESHOLDS.length; i++) {
+      if (value < THRESHOLDS[i]) return i;
+    }
+    return THRESHOLDS.length;
+  }
+
+  function riskLevel(value) {
+    var idx = riskIndex(value);
+    return idx == null ? null : LEVELS[idx];
+  }
+
+  function badgeStyle(idx) {
+    var dark = idx === 1 || idx === 2;
+    return "background:" + COLORS[idx] + ";color:" + (dark ? "#1f2937" : "#ffffff");
+  }
+
+  function valueOf(iso, month) {
+    var country = DATA.countries[iso];
+    if (!country) return null;
+    var value = country.values[month == null ? state.month : month];
+    return value == null ? null : Number(value);
+  }
+
+  function countryMeta(iso) {
+    return DATA.countries[iso] || null;
+  }
+
+  function displayName(iso) {
+    var meta = countryMeta(iso);
+    if (meta) return meta.name_zh;
+    return (NAME_CACHE[iso] && NAME_CACHE[iso].name_zh) || iso;
+  }
+
+  function displayNameEn(iso) {
+    var meta = countryMeta(iso);
+    if (meta) return meta.name_en;
+    return (NAME_CACHE[iso] && NAME_CACHE[iso].name_en) || iso;
+  }
+
+  function monthIndex(month) {
+    return MONTHS.indexOf(month);
+  }
+
+  function rankings(month) {
+    if (rankCache[month]) return rankCache[month];
+    var list = [];
+    Object.keys(DATA.countries).forEach(function (iso) {
+      var value = valueOf(iso, month);
+      if (value == null) return;
+      var meta = DATA.countries[iso];
+      list.push({
+        iso: iso,
+        value: value,
+        name_zh: meta.name_zh,
+        name_en: meta.name_en,
+        region: meta.region
+      });
+    });
+    list.sort(function (a, b) { return b.value - a.value; });
+    list.forEach(function (item, i) { item.rank = i + 1; });
+    rankCache[month] = list;
+    return list;
+  }
+
+  function toast(message) {
+    var el = $("toast");
+    el.textContent = message;
+    el.classList.add("show");
+    clearTimeout(el._timer);
+    el._timer = setTimeout(function () { el.classList.remove("show"); }, 1900);
+  }
+
+  function download(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 200);
+  }
+
+  function csvCell(value) {
+    var text = value == null ? "" : String(value);
+    if (/[",\r\n]/.test(text)) return '"' + text.replace(/"/g, '""') + '"';
+    return text;
+  }
+
+  /* ======================================================================
+   * 地图初始化
+   * ==================================================================== */
+  function initMap() {
+    MAP = L.map("map", {
+      zoomControl: false,
+      attributionControl: false,
+      minZoom: 0.5,
+      maxZoom: 7,
+      zoomSnap: 0.25,
+      zoomDelta: 0.5,
+      wheelPxPerZoomLevel: 90,
+      worldCopyJump: true,
+      maxBounds: [[-85, -200], [85, 200]],
+      maxBoundsViscosity: 0.8,
+      preferCanvas: false
+    });
+
+    L.control.zoom({ position: "bottomright" }).addTo(MAP);
+    L.control.attribution({ position: "bottomright", prefix: false })
+      .addTo(MAP)
+      .addAttribution('GPR Index © Caldara &amp; Iacoviello (2022) · 边界 © Natural Earth');
+
+    fitWorld();
+
+    // 经纬网（纯静态底图，不依赖外部瓦片服务）
+    var grid = L.layerGroup();
+    [-60, -30, 0, 30, 60].forEach(function (lat) {
+      L.polyline([[lat, -180], [lat, 180]], {
+        color: "#c9d6e6", weight: 0.55, opacity: 0.65, interactive: false
+      }).addTo(grid);
+    });
+    [-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150].forEach(function (lon) {
+      L.polyline([[-84, lon], [84, lon]], {
+        color: "#c9d6e6", weight: 0.55, opacity: 0.65, interactive: false
+      }).addTo(grid);
+    });
+    grid.addTo(MAP);
+
+    EVENT_GROUP = L.layerGroup().addTo(MAP);
+
+    GEO_LAYER = L.geoJSON(WORLD, {
+      style: function (feature) {
+        return countryStyle(feature.properties.iso3);
+      },
+      onEachFeature: function (feature, layer) {
+        var iso = feature.properties.iso3;
+        if (!NAME_CACHE[iso]) {
+          NAME_CACHE[iso] = {
+            name_zh: feature.properties.name_zh,
+            name_en: feature.properties.name_en
+          };
+        }
+        LAYERS[iso] = layer;
+
+        layer.bindTooltip("", {
+          sticky: true,
+          direction: "top",
+          className: "gpr-tooltip",
+          opacity: 1,
+          offset: [0, -12]
+        });
+
+        layer.on({
+          mouseover: function () {
+            state.hoverIso = iso;
+            this.setStyle({
+              weight: 2,
+              color: "#111827",
+              fillOpacity: valueOf(iso) == null ? 1 : 0.96
+            });
+            this.bringToFront();
+            this.setTooltipContent(tooltipHtml(iso));
+            this.openTooltip();
+          },
+          mouseout: function () {
+            state.hoverIso = null;
+            this.setStyle(countryStyle(iso));
+          },
+          click: function (e) {
+            if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+            toggleCountry(iso);
+          }
+        });
+      }
+    }).addTo(MAP);
+
+    initLegend();
+    MAP.on("zoomend", function () {
+      MAP.getContainer().classList.add("is-zoomed");
+    });
+  }
+
+  function countryStyle(iso) {
+    var value = valueOf(iso);
+    var idx = riskIndex(value);
+    var selected = state.selected.has(iso);
+    return {
+      fillColor: idx == null ? NO_DATA_COLOR : COLORS[idx],
+      fillOpacity: idx == null ? 0.92 : 0.87,
+      color: selected ? "#4c1d95" : "#ffffff",
+      weight: selected ? 2.1 : 0.6,
+      opacity: selected ? 1 : 0.92
+    };
+  }
+
+  function applyStyles() {
+    Object.keys(LAYERS).forEach(function (iso) {
+      LAYERS[iso].setStyle(countryStyle(iso));
+    });
+    // 保证选中国家边框显示在最后
+    state.selected.forEach(function (iso) {
+      if (LAYERS[iso]) LAYERS[iso].bringToFront();
+    });
+  }
+
+  function initLegend() {
+    var legend = L.control({ position: "bottomleft" });
+    legend.onAdd = function () {
+      var div = L.DomUtil.create("div", "map-legend");
+      var html = '<div class="lg-title">GPRC 风险等级 <span>(% 文章占比)</span></div>';
+      for (var i = 0; i < RANGES.length; i++) {
+        html += '<div class="lg-row"><i style="background:' + COLORS[i] + '"></i>' +
+          '<span>' + LEVELS[i] + '</span><b>' + RANGES[i] + '</b></div>';
+      }
+      html += '<div class="lg-row lg-missing"><i></i><span>无数据</span><b>—</b></div>';
+      div.innerHTML = html;
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.disableScrollPropagation(div);
+      return div;
+    };
+    legend.addTo(MAP);
+  }
+
+  /* ======================================================================
+   * Tooltip
+   * ==================================================================== */
+  function tooltipHtml(iso) {
+    var name = displayName(iso);
+    var nameEn = displayNameEn(iso);
+    var value = valueOf(iso);
+
+    if (value == null) {
+      return '<div class="tt-head"><b>' + escapeHtml(name) + '</b><span>' + escapeHtml(iso) + '</span></div>' +
+        '<div class="tt-empty">暂无 GPR 数据</div>' +
+        '<div class="tt-note">该国 / 地区不在 Iacoviello 44 国 GPRC 样本中</div>';
+    }
+
+    var idx = riskIndex(value);
+    var list = rankings(state.month);
+    var item = list.find(function (x) { return x.iso === iso; });
+    var rank = item ? item.rank : null;
+    var prevIdx = monthIndex(state.month) - 1;
+    var prev = prevIdx >= 0 ? valueOf(iso, MONTHS[prevIdx]) : null;
+    var delta = prev == null ? null : value - prev;
+    var deltaClass = delta == null ? "" : (delta > 0 ? "up" : (delta < 0 ? "down" : ""));
+    var deltaText = delta == null ? "—" :
+      (delta > 0 ? "+" : "") + delta.toFixed(2) + " pp";
+
+    return '<div class="tt-head"><b>' + escapeHtml(name) + '</b><span>' + escapeHtml(iso) + '</span></div>' +
+      '<div class="tt-body">' +
+        '<div class="tt-value"><strong>' + fmt(value) + '</strong><span class="tt-unit">% 文章占比</span>' +
+          '<span class="tt-badge" style="' + badgeStyle(idx) + '">' + LEVELS[idx] + '</span></div>' +
+        '<div class="tt-meta">' +
+          '<span>全球排名 <b>#' + (rank == null ? "—" : rank) + '</b> / ' + DATA.meta.country_count + '</span>' +
+          '<span class="' + deltaClass + '">较上月 <b class="' + deltaClass + '">' + deltaText + '</b></span>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ======================================================================
+   * 时间控制
+   * ==================================================================== */
+  function initControls() {
+    var slider = $("monthSlider");
+    var select = $("monthSelect");
+    slider.max = String(MONTHS.length - 1);
+    slider.value = String(MONTHS.length - 1);
+
+    MONTHS.forEach(function (month) {
+      var option = document.createElement("option");
+      option.value = month;
+      option.textContent = month;
+      select.appendChild(option);
+    });
+
+    slider.addEventListener("input", function () {
+      stopPlay();
+      setMonth(MONTHS[Number(this.value)]);
+    });
+    select.addEventListener("change", function () {
+      stopPlay();
+      setMonth(this.value);
+    });
+
+    $("playBtn").addEventListener("click", function () {
+      if (state.playing) { stopPlay(); return; }
+      startPlay();
+    });
+
+    $("eventToggle").addEventListener("change", function () {
+      state.eventsVisible = this.checked;
+      renderEvents();
+    });
+
+    $("resetView").addEventListener("click", resetView);
+
+    $("countrySearch").addEventListener("input", renderRank);
+    $("exportCsv").addEventListener("click", exportCsv);
+    $("exportJson").addEventListener("click", exportJson);
+    $("exportPng").addEventListener("click", exportPng);
+
+    window.addEventListener("resize", debounce(function () {
+      if (MAP) MAP.invalidateSize();
+      if (CHART) CHART.resize();
+    }, 140));
+  }
+
+  function startPlay() {
+    state.playing = true;
+    $("playBtn").textContent = "❚❚";
+    $("playBtn").title = "暂停播放";
+    state.playTimer = setInterval(function () {
+      var idx = monthIndex(state.month);
+      if (idx >= MONTHS.length - 1) { stopPlay(); return; }
+      setMonth(MONTHS[idx + 1]);
+    }, 780);
+  }
+
+  function stopPlay() {
+    state.playing = false;
+    $("playBtn").textContent = "▶";
+    $("playBtn").title = "播放时间序列";
+    if (state.playTimer) {
+      clearInterval(state.playTimer);
+      state.playTimer = null;
+    }
+  }
+
+  function setMonth(month) {
+    if (!DATA || monthIndex(month) < 0) return;
+    state.month = month;
+    syncMonthUI();
+    applyStyles();
+    renderRank();
+    updateKpis();
+    updateChart();
+    renderEvents();
+    $("mapMonthBadge").textContent = month;
+    $("rankMonth").textContent = month;
+    $("trendMonth").textContent = month;
+  }
+
+  function syncMonthUI() {
+    var idx = monthIndex(state.month);
+    var slider = $("monthSlider");
+    slider.value = String(idx);
+    slider.style.setProperty("--p", (idx / (MONTHS.length - 1) * 100).toFixed(2) + "%");
+    $("monthSelect").value = state.month;
+  }
+
+  function fitWorld() {
+    if (!MAP) return;
+    MAP.fitBounds([[-56, -168], [79, 188]], { padding: [6, 6] });
+  }
+
+  function resetView() {
+    if (!MAP) return;
+    fitWorld();
+    toast("视图已复位");
+  }
+
+  /* ======================================================================
+   * 排名
+   * ==================================================================== */
+  function renderRank() {
+    var query = $("countrySearch").value.trim().toLowerCase();
+    var list = rankings(state.month);
+    var filtered = list;
+    if (query) {
+      filtered = list.filter(function (item) {
+        return (item.iso + " " + item.name_zh + " " + item.name_en + " " + item.region)
+          .toLowerCase().indexOf(query) >= 0;
+      });
+    }
+    var top = filtered.slice(0, 10);
+    var max = list.length ? list[0].value : 1;
+    var container = $("rankList");
+    container.innerHTML = "";
+
+    if (!top.length) {
+      container.innerHTML = '<div class="rank-empty">未找到匹配的国家 / 地区</div>';
+      $("rankCount").textContent = "0 个结果";
+      return;
+    }
+
+    top.forEach(function (item) {
+      var idx = riskIndex(item.value);
+      var row = document.createElement("div");
+      row.className = "rank-row" + (state.selected.has(item.iso) ? " is-selected" : "");
+      row.dataset.iso = item.iso;
+      row.tabIndex = 0;
+      row.setAttribute("role", "button");
+      row.setAttribute("aria-label", item.name_zh + " " + item.value.toFixed(2) + "%");
+      row.innerHTML =
+        '<span class="rank-no">' + item.rank + '</span>' +
+        '<div class="rank-main">' +
+          '<div class="rank-top">' +
+            '<span class="rank-name">' + escapeHtml(item.name_zh) +
+              '<span>' + item.iso + '</span></span>' +
+            '<span class="rank-val">' + fmt(item.value) + '</span>' +
+          '</div>' +
+          '<div class="rank-bar-wrap"><div class="rank-bar" style="width:' +
+            Math.max(3, item.value / max * 100).toFixed(1) + '%;background:' + COLORS[idx] +
+          '"></div></div>' +
+        '</div>';
+
+      row.addEventListener("click", function () { toggleCountry(item.iso); });
+      row.addEventListener("keydown", function (event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggleCountry(item.iso);
+        }
+      });
+      row.addEventListener("mouseenter", function () {
+        if (LAYERS[item.iso]) {
+          LAYERS[item.iso].setStyle({ weight: 2, color: "#111827", fillOpacity: 0.96 });
+          LAYERS[item.iso].bringToFront();
+        }
+      });
+      row.addEventListener("mouseleave", function () {
+        if (LAYERS[item.iso]) LAYERS[item.iso].setStyle(countryStyle(item.iso));
+      });
+      container.appendChild(row);
+    });
+
+    $("rankCount").textContent = query
+      ? (filtered.length + " 个结果")
+      : ("Top 10 / " + list.length);
+  }
+
+  /* ======================================================================
+   * 指标卡
+   * ==================================================================== */
+  function updateKpis() {
+    var idx = monthIndex(state.month);
+    var globalValue = DATA.global.values[state.month];
+    var prev = idx > 0 ? DATA.global.values[MONTHS[idx - 1]] : null;
+    $("kpiGlobal").textContent = globalValue == null ? "—" : fmt(globalValue, 1);
+
+    var deltaEl = $("kpiGlobalDelta");
+    deltaEl.classList.remove("up", "down");
+    if (globalValue != null && prev != null && prev !== 0) {
+      var pct = (globalValue - prev) / prev * 100;
+      deltaEl.textContent = "环比 " + (pct > 0 ? "+" : "") + pct.toFixed(1) + "%";
+      deltaEl.classList.add(pct > 0 ? "up" : (pct < 0 ? "down" : ""));
+    } else {
+      deltaEl.textContent = "环比 —";
+    }
+
+    var list = rankings(state.month);
+    var high = list.filter(function (x) { return x.value >= THRESHOLDS[3]; });
+    $("kpiHigh").textContent = high.length + " 个";
+    if (list.length) {
+      $("kpiTop").textContent = list[0].name_zh;
+      $("kpiTopVal").textContent = fmt(list[0].value) + "% · " + riskLevel(list[0].value);
+    } else {
+      $("kpiTop").textContent = "—";
+      $("kpiTopVal").textContent = "—";
+    }
+  }
+
+  /* ======================================================================
+   * 国家选择与趋势图
+   * ==================================================================== */
+  function toggleCountry(iso) {
+    if (valueOf(iso) == null) {
+      toast(displayName(iso) + " 暂无 GPRC 数据");
+      return;
+    }
+    if (state.selected.has(iso)) {
+      state.selected.delete(iso);
+    } else {
+      if (state.selected.size >= 5) {
+        toast("最多同时对比 5 个国家");
+        return;
+      }
+      state.selected.add(iso);
+    }
+    applyStyles();
+    renderRank();
+    renderChips();
+    updateChart();
+  }
+
+  function seriesColor(iso) {
+    var order = Array.from(state.selected);
+    var idx = order.indexOf(iso);
+    return SERIES_COLORS[(idx < 0 ? 0 : idx) % SERIES_COLORS.length];
+  }
+
+  function renderChips() {
+    var container = $("chips");
+    container.innerHTML = "";
+    if (!state.selected.size) {
+      container.innerHTML = '<span class="chip">未选择国家</span>';
+      return;
+    }
+    state.selected.forEach(function (iso) {
+      var chip = document.createElement("span");
+      chip.className = "chip";
+      chip.innerHTML = '<i style="background:' + seriesColor(iso) + '"></i>' +
+        escapeHtml(displayName(iso)) +
+        '<button type="button" title="移除" aria-label="移除 ' + escapeHtml(displayName(iso)) + '">×</button>';
+      chip.querySelector("button").addEventListener("click", function (event) {
+        event.stopPropagation();
+        toggleCountry(iso);
+      });
+      container.appendChild(chip);
+    });
+  }
+
+  function updateChart() {
+    var empty = $("chartEmpty");
+    if (!state.selected.size) {
+      if (CHART) CHART.clear();
+      empty.classList.remove("hidden");
+      return;
+    }
+    empty.classList.add("hidden");
+
+    if (!CHART) {
+      CHART = echarts.init($("trendChart"), null, { renderer: "canvas" });
+      CHART.on("click", function (params) {
+        if (params.componentType === "series") {
+          setMonth(MONTHS[Math.round(params.dataIndex)] || state.month);
+        }
+      });
+    }
+
+    var selected = Array.from(state.selected);
+    var series = selected.map(function (iso) {
+      var meta = DATA.countries[iso];
+      var values = MONTHS.map(function (month) { return valueOf(iso, month); });
+      var single = selected.length === 1;
+      return {
+        name: meta.name_zh,
+        type: "line",
+        data: values,
+        smooth: 0.28,
+        symbol: "circle",
+        symbolSize: 4,
+        showSymbol: false,
+        connectNulls: false,
+        lineStyle: { width: single ? 2.6 : 2.1, color: seriesColor(iso) },
+        itemStyle: { color: seriesColor(iso) },
+        emphasis: { focus: "series", lineStyle: { width: 3 } },
+        areaStyle: single ? {
+          opacity: 0.16,
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: seriesColor(iso) },
+            { offset: 1, color: "rgba(255,255,255,0)" }
+          ])
+        } : null
+      };
+    });
+
+    // 当前月份参考线 + 高风险阈值线（用透明辅助系列承载，避免重复绘制）
+    var markData = [
+      {
+        xAxis: state.month,
+        label: {
+          show: false
+        },
+        lineStyle: { color: "#8b5cf6", type: "dashed", width: 1.1, opacity: 0.9 }
+      },
+      {
+        yAxis: THRESHOLDS[3],
+        label: {
+          show: true,
+          formatter: "高风险阈值 " + THRESHOLDS[3].toFixed(2),
+          position: "insideEndBottom",
+          color: "#c2410c",
+          fontSize: 8.5
+        },
+        lineStyle: { color: "#fb923c", type: "dotted", width: 1, opacity: 0.85 }
+      }
+    ];
+    series.push({
+      name: "__cursor__",
+      type: "line",
+      data: [],
+      silent: true,
+      tooltip: { show: false },
+      lineStyle: { opacity: 0 },
+      markLine: {
+        silent: true,
+        symbol: "none",
+        animation: false,
+        label: { show: false },
+        lineStyle: { color: "#8b5cf6", type: "dashed", width: 1.1, opacity: 0.9 },
+        data: markData
+      }
+    });
+
+    CHART.setOption({
+      animationDuration: 450,
+      animationDurationUpdate: 260,
+      color: SERIES_COLORS,
+      grid: { left: 38, right: 10, top: 22, bottom: 24 },
+      tooltip: {
+        trigger: "axis",
+        confine: true,
+        backgroundColor: "rgba(15,23,42,.95)",
+        borderWidth: 0,
+        padding: [7, 9],
+        textStyle: { color: "#f8fafc", fontSize: 10 },
+        axisPointer: { type: "line", lineStyle: { color: "#c4b5fd", type: "dashed" } },
+        formatter: function (params) {
+          var list = params.filter(function (p) { return p.seriesName !== "__cursor__"; });
+          if (!list.length) return "";
+          var html = '<div style="font-weight:700;margin-bottom:4px">' + params[0].axisValue + '</div>';
+          list.forEach(function (p) {
+            html += '<div style="display:flex;align-items:center;gap:6px;margin:2px 0">' +
+              '<span style="width:7px;height:7px;border-radius:50%;background:' + p.color + ';display:inline-block"></span>' +
+              '<span style="flex:1">' + p.seriesName + '</span>' +
+              '<b style="margin-left:10px">' + (p.value == null ? "—" : Number(p.value).toFixed(2)) + '</b>' +
+              '</div>';
+          });
+          return html;
+        }
+      },
+      xAxis: {
+        type: "category",
+        boundaryGap: false,
+        data: MONTHS,
+        axisLine: { lineStyle: { color: "#e2e8f0" } },
+        axisTick: { show: false },
+        axisLabel: {
+          color: "#94a3b8",
+          fontSize: 8.5,
+          interval: function (index) {
+            return MONTHS[index].slice(5) === "01" || index === MONTHS.length - 1;
+          },
+          formatter: function (value) { return value.slice(0, 4); }
+        }
+      },
+      yAxis: {
+        type: "value",
+        min: 0,
+        name: "GPRC (%)",
+        nameTextStyle: { color: "#94a3b8", fontSize: 8.5, padding: [0, 0, 2, -2] },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: "#94a3b8", fontSize: 8.5 },
+        splitLine: { lineStyle: { color: "#eef2f7", type: "dashed" } }
+      },
+      series: series
+    }, { notMerge: true });
+    CHART.resize();
+  }
+
+  /* ======================================================================
+   * 事件标注
+   * ==================================================================== */
+  function renderEvents() {
+    if (!EVENT_GROUP) return;
+    EVENT_GROUP.clearLayers();
+    if (!state.eventsVisible) return;
+
+    DATA.events.forEach(function (event) {
+      if (event.date > state.month) return;
+      var active = event.date === state.month;
+      var icon = L.divIcon({
+        className: "event-icon" + (active ? " is-active" : ""),
+        html: '<span class="event-dot"></span>',
+        iconSize: [12, 12],
+        iconAnchor: [6, 6]
+      });
+      var marker = L.marker([event.lat, event.lon], {
+        icon: icon,
+        riseOnHover: true,
+        zIndexOffset: active ? 800 : 400
+      });
+      marker.bindTooltip(
+        '<div class="ev-title">' + escapeHtml(event.title) + '</div>' +
+        '<div class="ev-date">' + event.date + ' · 点击跳转该月</div>' +
+        '<div class="ev-desc">' + escapeHtml(event.desc) + '</div>',
+        { direction: "top", className: "event-tooltip", offset: [0, -9], opacity: 1, maxWidth: 250 }
+      );
+      marker.on("click", function () {
+        setMonth(event.date);
+        MAP.flyTo([event.lat, event.lon], Math.max(MAP.getZoom(), 3.25), { duration: 0.8 });
+      });
+      marker.addTo(EVENT_GROUP);
+    });
+  }
+
+  /* ======================================================================
+   * 导出
+   * ==================================================================== */
+  function exportCsv() {
+    var rows = rankings(state.month);
+    var header = ["month", "rank", "iso3", "country_zh", "country_en", "region", "gprc_percent", "risk_level"];
+    var lines = [header.join(",")];
+    rows.forEach(function (item) {
+      lines.push([
+        state.month, item.rank, item.iso, item.name_zh, item.name_en,
+        item.region, item.value.toFixed(3), riskLevel(item.value)
+      ].map(csvCell).join(","));
+    });
+    var blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+    download(blob, "gpr-" + state.month + ".csv");
+    toast("已导出 CSV（" + rows.length + " 个国家）");
+  }
+
+  function exportJson() {
+    var rows = rankings(state.month).map(function (item) {
+      return {
+        rank: item.rank,
+        iso3: item.iso,
+        country_zh: item.name_zh,
+        country_en: item.name_en,
+        region: item.region,
+        gprc: Number(item.value.toFixed(3)),
+        unit: "% of newspaper articles",
+        risk_level: riskLevel(item.value)
+      };
+    });
+    var payload = {
+      month: state.month,
+      source: DATA.meta.source,
+      source_url: DATA.meta.source_url,
+      thresholds: THRESHOLDS,
+      risk_levels: LEVELS,
+      global_gpr: DATA.global.values[state.month],
+      countries: rows
+    };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    download(blob, "gpr-" + state.month + ".json");
+    toast("已导出 JSON");
+  }
+
+  function exportPng() {
+    if (typeof html2canvas !== "function") {
+      toast("PNG 导出组件未加载");
+      return;
+    }
+    toast("正在生成 PNG…");
+    var card = document.querySelector(".map-card");
+    html2canvas(card, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      logging: false
+    }).then(function (canvas) {
+      canvas.toBlob(function (blob) {
+        if (!blob) { toast("PNG 生成失败"); return; }
+        download(blob, "gpr-map-" + state.month + ".png");
+        toast("已导出地图 PNG");
+      }, "image/png");
+    }).catch(function () {
+      toast("PNG 生成失败，请重试");
+    });
+  }
+
+  /* ======================================================================
+   * 启动
+   * ==================================================================== */
+  function boot() {
+    Promise.all([
+      fetch("data/gpr_monthly.json", { cache: "no-store" }).then(function (response) {
+        if (!response.ok) throw new Error("gpr_monthly.json " + response.status);
+        return response.json();
+      }),
+      fetch("data/world.geojson", { cache: "no-store" }).then(function (response) {
+        if (!response.ok) throw new Error("world.geojson " + response.status);
+        return response.json();
+      })
+    ]).then(function (results) {
+      DATA = results[0];
+      WORLD = results[1];
+
+      MONTHS = DATA.meta.months;
+      THRESHOLDS = DATA.meta.thresholds;
+      COLORS = DATA.meta.colors;
+      LEVELS = DATA.meta.risk_levels;
+      RANGES = DATA.meta.range_labels;
+
+      // 元信息
+      $("metaRange").textContent = MONTHS[0].slice(0, 4) + "–" + MONTHS[MONTHS.length - 1].slice(0, 4);
+      $("metaCount").textContent = DATA.meta.country_count + " 个国家 / 地区";
+      $("kpiCoverage").textContent = String(DATA.meta.country_count);
+      $("kpiMonths").textContent = MONTHS.length + " 个月 · " + MONTHS[0].slice(0, 4) + "–" + MONTHS[MONTHS.length - 1].slice(0, 4);
+
+      state.month = MONTHS[MONTHS.length - 1];
+
+      initMap();
+      initControls();
+      renderChips();
+      setMonth(state.month);
+
+      $("loading").classList.add("hide");
+      setTimeout(function () {
+        MAP.invalidateSize();
+        fitWorld();
+        if (CHART) CHART.resize();
+      }, 180);
+
+      // 对外暴露少量调试/截图 API（不影响正常交互）
+      window.__gpr = {
+        setMonth: setMonth,
+        select: function (iso) { if (!state.selected.has(iso)) toggleCountry(iso); },
+        clearSelection: function () {
+          state.selected.clear();
+          applyStyles(); renderRank(); renderChips(); updateChart();
+        },
+        reset: function () { fitWorld(); },
+        view: function () {
+          return {
+            zoom: MAP.getZoom(),
+            center: MAP.getCenter(),
+            size: MAP.getSize(),
+            bounds: MAP.getBounds()
+          };
+        },
+        focusCountry: function (iso) {
+          var layer = LAYERS[iso];
+          if (!layer) return null;
+          var center = layer.getBounds().getCenter();
+          var point = MAP.latLngToContainerPoint(center);
+          var rect = $("map").getBoundingClientRect();
+          return { x: rect.left + point.x, y: rect.top + point.y, iso: iso };
+        },
+        zoomRegion: function (name) {
+          var views = {
+            europe: [[54, 16], 4.25],
+            asia: [[30, 105], 3.5],
+            africa: [[6, 20], 3.5],
+            americas: [[15, -80], 3]
+          };
+          var view = views[name] || views.europe;
+          MAP.setView(view[0], view[1]);
+        }
+      };
+    }).catch(function (error) {
+      $("loadingText").textContent = "数据加载失败：" + error.message;
+      $("loading").style.color = "#b91c1c";
+      console.error(error);
+    });
+  }
+
+  function debounce(fn, wait) {
+    var timer = null;
+    return function () {
+      clearTimeout(timer);
+      timer = setTimeout(fn, wait);
+    };
+  }
+
+  document.addEventListener("DOMContentLoaded", boot);
+})();
+</script>
+</body>
+</html>
